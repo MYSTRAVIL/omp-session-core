@@ -206,12 +206,16 @@ export class Provider {
     }
   }
 
-  /** Ask the terminal for focus reports and take them out of omp's input. */
+  /**
+   * Ask the terminal for focus reports and take them out of omp's input, when
+   * the session has the terminal: a UI in a TTY, and not a subagent, whose
+   * shutdown would otherwise turn the reports off under the main session.
+   */
   #listen(ctx: OmpContext): void {
     this.#unlisten?.();
     this.#unlisten = undefined;
     const onTerminalInput = ctx.ui?.onTerminalInput;
-    if (!hasTerminal(ctx) || typeof onTerminalInput !== "function") return;
+    if (!this.#identity?.terminal || typeof onTerminalInput !== "function") return;
     this.#unlisten = onTerminalInput.call(ctx.ui, (data: string) => {
       try {
         return this.#focus.input(data);
@@ -270,6 +274,6 @@ function readIdentity(ctx: OmpContext, movedFrom: string | undefined): Identity 
   if (file) identity.sessionFile = file;
   if (agent) identity.agent = agent;
   if (movedFrom) identity.movedFrom = movedFrom;
-  if (hasTerminal(ctx)) identity.terminal = terminalIdentity();
+  if (!identity.subagent && hasTerminal(ctx)) identity.terminal = terminalIdentity();
   return identity;
 }

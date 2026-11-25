@@ -119,9 +119,11 @@ frozen, so one app cannot change what another reads.
 
   `sessionFile` is absent for a session omp does not persist. `agent` is omp's `ctx.agent` (18.3.2+).
   `subagent` comes from `ctx.agent.kind`, or on older omp from the omp-remote bridge's file-layout rule.
-  `terminal` is present when the session has a UI and stdout is a TTY. The design's
-  `parentSessionId` is left out: omp gives a subagent its parent's session file and agent id, not the
-  parent session id, and no consumer reads it today.
+  `terminal` is present when the session has a UI, stdout is a TTY, and the session is not a
+  subagent. Only such a session's provider takes terminal input and writes DECSET 1004: a subagent's
+  shutdown must not turn focus reporting off under the main session. The design's `parentSessionId`
+  is left out: omp gives a subagent its parent's session file and agent id, not the parent session
+  id, and no consumer reads it today.
 - `desk-idle` is a pull, not an event: `idleMs(): number | null`, read through the provider.
 
 Versioning:

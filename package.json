@@ -32,6 +32,7 @@
     "consumer": "bun scripts/consumer.ts"
   },
   "devDependencies": {
+    "@oh-my-pi/pi-coding-agent": "19.0.1",
     "@types/bun": "latest",
     "typescript": "^5.9.0"
   }

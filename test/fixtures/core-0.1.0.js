@@ -309,7 +309,7 @@ class Provider {
     this.#unlisten?.();
     this.#unlisten = undefined;
     const onTerminalInput = ctx.ui?.onTerminalInput;
-    if (!hasTerminal(ctx) || typeof onTerminalInput !== "function")
+    if (!this.#identity?.terminal || typeof onTerminalInput !== "function")
       return;
     this.#unlisten = onTerminalInput.call(ctx.ui, (data) => {
       try {
@@ -369,7 +369,7 @@ function readIdentity(ctx, movedFrom) {
     identity.agent = agent;
   if (movedFrom)
     identity.movedFrom = movedFrom;
-  if (hasTerminal(ctx))
+  if (!identity.subagent && hasTerminal(ctx))
     identity.terminal = terminalIdentity();
   return identity;
 }

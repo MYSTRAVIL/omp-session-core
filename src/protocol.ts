@@ -57,7 +57,7 @@ export interface SessionStateV1 {
   status: SessionStatus;
   /** What the session waits on the user for; absent when it waits on nothing. */
   waitingOn?: WaitingOn;
-  /** Present when the session has a UI in a terminal. */
+  /** Present when the session has a UI in a terminal and is not a subagent: then its provider owns the terminal's focus reporting. */
   terminal?: TerminalIdentity;
   /** When this state began, in ms since the epoch. */
   at: number;

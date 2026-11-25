@@ -41,7 +41,10 @@ export interface OmpContext {
 
 /** omp's `ExtensionAPI` (`pi`), as the default export of an extension receives it. */
 export interface OmpExtensionApi {
-  on(event: string, handler: (event: never, ctx: never) => unknown): void;
+  // `any`, not `never` or `unknown`: omp declares one `on` overload per event, and TypeScript checks a
+  // callback's parameters strictly, so only `any` lets omp's real `ExtensionAPI` in without a cast. It
+  // also lets an app with no omp types call `pi.on(...)` on this type.
+  on(event: string, handler: (event: any, ctx: any) => unknown): void;
   /** Absent on old omp; the core then stays inert. */
   readonly events?: OmpEventBus;
 }

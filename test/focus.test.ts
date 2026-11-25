@@ -107,3 +107,20 @@ test("a UI whose output is not a terminal never touches it", async () => {
   expect(stdout.writes).toEqual([]);
   expect(terminal.listeners.size).toBe(0);
 });
+
+test("a subagent never touches the terminal, even with a UI", async () => {
+  const terminal = new FakeTerminal();
+  const session = new FakeSession({
+    id: "tan1",
+    hasUI: true,
+    agent: { kind: "sub", id: "tan", name: "sub", depth: 0, parentId: "Main" },
+    terminal,
+  });
+  const core = session.load(startSessionCore);
+  await session.start();
+  await session.emit("session_shutdown");
+
+  expect(stdout.writes).toEqual([]);
+  expect(terminal.listeners.size).toBe(0);
+  expect(core.state()?.terminal).toBeUndefined();
+});
