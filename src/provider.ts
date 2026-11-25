@@ -19,6 +19,12 @@ type Identity = Pick<
 /** An omp event, read field by field. */
 type OmpEvent = Record<string, unknown>;
 
+/**
+ * Which open wait the state reports when several are open: an approval holds
+ * a tool call, a plan review holds the plan's run, an ask is one question.
+ */
+const WAIT_RANK: readonly WaitingOn[] = ["approval", "plan-review", "ask"];
+
 /** Whether this copy ever turned focus reporting on; the exit hook turns it off. */
 let focusReportingUsed = false;
 let exitHookInstalled = false;
@@ -50,7 +56,7 @@ export class Provider {
   readonly #seen = new WeakSet<object>();
   #identity: Identity | undefined;
   #status: SessionStatus = "idle";
-  /** Open waits on the user, oldest first; the newest is the one reported. */
+  /** Open waits on the user, by key; the highest-ranked kind is the one reported. */
   readonly #waits = new Map<string, WaitingOn>();
   /** The last payload emitted on each channel. */
   readonly #last = new Map<string, unknown>();
@@ -64,6 +70,9 @@ export class Provider {
   });
   #unlisten: (() => void) | undefined;
   #reporting = false;
+  /** Session managers whose move notices this provider follows, and how to stop following them. */
+  #noticed = new WeakSet<object>();
+  readonly #unwatchMoves: (() => void)[] = [];
 
   /** What each omp event does to the state. Every handler is idempotent. */
   readonly #handlers = new Map<string, (event: OmpEvent, ctx: OmpContext) => void>([
@@ -108,8 +117,23 @@ export class Provider {
     ["tool_approval_requested", (event) => this.#open(`approval:${String(event.toolCallId)}`, "approval")],
     ["tool_approval_resolved", (event) => this.#close(`approval:${String(event.toolCallId)}`)],
     ["plan_review_requested", (event) => this.#open(`plan:${String(event.reviewId)}`, "plan-review")],
-    ["plan_review_resolved", (event) => this.#close(`plan:${String(event.reviewId)}`)],
-    ["session_shutdown", () => this.#stopTerminal()],
+    [
+      "plan_review_resolved",
+      (event, ctx) => {
+        // omp emits the close after the overlay shuts, so an approved plan may already run.
+        if (ctx.isIdle?.() === false) this.#status = "busy";
+        this.#waits.delete(`plan:${String(event.reviewId)}`);
+        this.#publish();
+      },
+    ],
+    [
+      "session_shutdown",
+      () => {
+        this.#stopTerminal();
+        for (const unwatch of this.#unwatchMoves.splice(0)) unwatch();
+        this.#noticed = new WeakSet();
+      },
+    ],
   ]);
 
   constructor(bus: OmpEventBus) {
@@ -146,8 +170,28 @@ export class Provider {
     const review = ctx.getPendingPlanReview?.();
     if (review) this.#waits.set(`plan:${review.reviewId}`, "plan-review");
     this.#publish();
+    this.#watchMoves(ctx);
     // omp drops extension input listeners when it replaces the session.
     this.#listen(ctx);
+  }
+
+  /**
+   * A write outside any turn (e.g. `/model` before the first prompt of a
+   * resumed session another omp holds) moves the session with no event; omp
+   * 18.5+ raises only a persistence notice. Followed once per session manager.
+   */
+  #watchMoves(ctx: OmpContext): void {
+    const sessions = ctx.sessionManager;
+    if (typeof sessions.onPersistenceNotice !== "function" || this.#noticed.has(sessions)) return;
+    this.#noticed.add(sessions);
+    const unwatch = sessions.onPersistenceNotice(() => {
+      try {
+        this.#follow(ctx);
+      } catch {
+        // The notice comes from omp's write path: never throw into it.
+      }
+    });
+    if (typeof unwatch === "function") this.#unwatchMoves.push(unwatch);
   }
 
   #busy(ctx: OmpContext): void {
@@ -176,7 +220,6 @@ export class Provider {
   }
 
   #open(key: string, kind: WaitingOn): void {
-    this.#waits.delete(key);
     this.#waits.set(key, kind);
     this.#publish();
   }
@@ -187,7 +230,8 @@ export class Provider {
 
   #publish(): void {
     if (!this.#identity) return;
-    const waitingOn = [...this.#waits.values()].at(-1);
+    const open = new Set(this.#waits.values());
+    const waitingOn = WAIT_RANK.find((kind) => open.has(kind));
     const state: Omit<SessionStateV1, "at"> = { v: 1, ...this.#identity, status: this.#status };
     if (waitingOn) state.waitingOn = waitingOn;
     const key = JSON.stringify(state);

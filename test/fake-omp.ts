@@ -3,6 +3,7 @@ import type {
   OmpExtensionApi,
   OmpInputResult,
   OmpSessionHeader,
+  OmpSessionManager,
 } from "../src/omp";
 
 type Handler = (event: unknown, ctx: OmpContext) => unknown;
@@ -125,20 +126,42 @@ export class FakeSession {
     return factory(pi as unknown as OmpExtensionApi);
   }
 
+  /** omp hands every handler the same session manager, which moves sessions and notices it. */
+  readonly #sessionManager: OmpSessionManager = {
+    getSessionId: () => (this.#guard(), this.id),
+    getSessionFile: () => (this.#guard(), this.file),
+    getCwd: () => (this.#guard(), this.cwd),
+    getHeader: () => (this.#guard(), this.header),
+    onPersistenceNotice: (cb) => {
+      for (const notice of this.#notices) cb(notice);
+      this.#noticeListeners.add(cb);
+      return () => {
+        this.#noticeListeners.delete(cb);
+      };
+    },
+  };
+  readonly #notices: unknown[] = [];
+  readonly #noticeListeners = new Set<(notice: unknown) => void>();
+
+  #guard(): void {
+    if (this.broken) throw new Error("session disposed");
+  }
+
+  /** omp moves the session to a new id at a write outside any turn, and raises only a persistence notice. */
+  moveWithNotice(id: string, header: OmpSessionHeader): void {
+    this.id = id;
+    this.header = header;
+    const notice = { reason: "held-elsewhere", sessionId: id };
+    this.#notices.push(notice);
+    for (const cb of this.#noticeListeners) cb(notice);
+  }
+
   ctx(): OmpContext {
-    const guard = (): void => {
-      if (this.broken) throw new Error("session disposed");
-    };
     const terminal = this.hasUI ? this.terminal : undefined;
     const ctx: OmpContext = {
       hasUI: this.hasUI,
       cwd: this.cwd,
-      sessionManager: {
-        getSessionId: () => (guard(), this.id),
-        getSessionFile: () => (guard(), this.file),
-        getCwd: () => (guard(), this.cwd),
-        getHeader: () => (guard(), this.header),
-      },
+      sessionManager: this.#sessionManager,
       isIdle: () => this.idle,
       getPendingPlanReview: () => this.pendingPlanReview,
       ui: {

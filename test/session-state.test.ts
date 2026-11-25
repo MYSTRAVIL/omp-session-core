@@ -133,15 +133,18 @@ test("a tool approval waits on the user until it is resolved", async () => {
   expect(core.state()?.waitingOn).toBeUndefined();
 });
 
-test("the newest open wait is the one reported", async () => {
+test("an approval outranks a plan review, which outranks an ask, whichever opened first", async () => {
   const { session, core } = await started();
   await session.emit("agent_start");
   await session.emit("tool_approval_requested", { toolCallId: "c1", toolName: "bash" });
+  await session.emit("plan_review_requested", { reviewId: "r1" });
   await session.emit("tool_call", { toolName: "ask", toolCallId: "c2", input: {} });
-  expect(core.state()?.waitingOn).toBe("ask");
-  await session.emit("tool_result", { toolName: "ask", toolCallId: "c2", input: {} });
-
   expect(core.state()?.waitingOn).toBe("approval");
+  await session.emit("tool_approval_resolved", { toolCallId: "c1", toolName: "bash", approved: true });
+  expect(core.state()?.waitingOn).toBe("plan-review");
+  await session.emit("plan_review_resolved", { reviewId: "r1", choice: "refine", by: "local" });
+
+  expect(core.state()?.waitingOn).toBe("ask");
 });
 
 test("the end of a turn closes asks and approvals left open, but a plan review outlasts it", async () => {
@@ -166,6 +169,17 @@ test("a plan review already open when the core starts counts", async () => {
   expect(core.state()?.waitingOn).toBe("plan-review");
 });
 
+test("a plan review resolved while the approved plan already runs reports busy", async () => {
+  const { session, core } = await started();
+  await session.emit("plan_review_requested", { reviewId: "r1" });
+  // omp emits the close after the overlay shuts, so the plan may already be running.
+  session.idle = false;
+  await session.emit("plan_review_resolved", { reviewId: "r1", choice: "execute", by: "local" });
+
+  expect(core.state()).toMatchObject({ status: "busy" });
+  expect(core.state()?.waitingOn).toBeUndefined();
+});
+
 test("a switch reports the new session and drops the old one's waits", async () => {
   const { session, core } = await started();
   await session.emit("tool_approval_requested", { toolCallId: "c1", toolName: "bash" });
@@ -186,6 +200,25 @@ test("a silent move reports the new id and the id it moved from, and keeps the o
   await session.emit("turn_end", { turnIndex: 0 });
 
   expect(core.state()).toMatchObject({ sessionId: "s1-moved", movedFrom: "s1", status: "busy", waitingOn: "ask" });
+});
+
+test("a move outside any turn is followed as soon as omp notices it", async () => {
+  const { session, core } = await started();
+  // A write before the first prompt (e.g. /model in a resumed session another omp holds) moves the
+  // session with no event at all; omp only raises a persistence notice.
+  session.moveWithNotice("s1-moved", { parentSession: "s1", continuationOf: "s1" });
+
+  expect(core.state()).toMatchObject({ sessionId: "s1-moved", movedFrom: "s1", status: "idle" });
+});
+
+test("after a switch, a move outside any turn is still followed", async () => {
+  const session = new FakeSession({ id: "s1", hasUI: true, agent: MAIN_AGENT });
+  const core = session.load(startSessionCore);
+  await session.start();
+  await session.switchTo("s2", "resume");
+  session.moveWithNotice("s2-moved", { continuationOf: "s2" });
+
+  expect(core.state()).toMatchObject({ sessionId: "s2-moved", movedFrom: "s2" });
 });
 
 test("a fork is not a move", async () => {

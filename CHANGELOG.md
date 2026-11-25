@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.1
+
+- With several waits open, `waitingOn` reports the most pressing one: an approval outranks a plan
+  review, which outranks an ask. 0.1.0 reported the newest.
+- A move outside any turn (for example `/model` before the first prompt of a resumed session that
+  another omp holds) now reaches the state at once: the provider follows omp's persistence notices.
+  Found by omp-manager's adoption.
+- A resolved plan review reports busy when the approved plan already runs.
+
 ## 0.1.0
 
 First release.

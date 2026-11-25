@@ -22,6 +22,11 @@ export interface OmpSessionManager {
   getSessionFile?(): string | undefined;
   getCwd?(): string;
   getHeader?(): OmpSessionHeader | null;
+  /**
+   * omp 18.5+: notices that the session moved to a new file, replayed to a late subscriber.
+   * Returns the unsubscribe.
+   */
+  onPersistenceNotice?(cb: (notice: unknown) => void): () => void;
 }
 
 /** What omp's raw terminal input listener returns. */

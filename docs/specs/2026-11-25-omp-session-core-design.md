@@ -139,13 +139,13 @@ Versioning:
 |---|---|
 | Start | `session_start`: identity from `ctx`; status from `ctx.isIdle()`; a plan review already open (`ctx.getPendingPlanReview()`) counts. |
 | Switch | `session_switch`, `session_branch`: new identity, waits dropped, input listener installed again (omp drops extension input listeners when it replaces the session). |
-| Silent move | The id is checked on `message_start`, `turn_end` and every status event. A new id whose header names the old one (`continuationOf ?? parentSession`) is a move: `movedFrom` is set and open waits stay. Any other new id drops the waits. |
+| Silent move | The id is checked on `message_start`, `turn_end`, every status event, and each persistence notice from `sessionManager.onPersistenceNotice` (omp 18.5+), which catches a move outside any turn. A new id whose header names the old one (`continuationOf ?? parentSession`) is a move: `movedFrom` is set and open waits stay. Any other new id drops the waits. |
 | Busy | `agent_start`, `turn_start`. |
 | Idle | `agent_end`, unless `willContinue` without `awaitingAsyncWork`. A background-job wait is idle: the session takes input. |
 | Ask | `tool_call` with `toolName === 'ask'` until its `tool_result`. |
 | Approval | `tool_approval_requested` until `tool_approval_resolved`, by `toolCallId`. |
-| Plan review | `plan_review_requested` until `plan_review_resolved`, by `reviewId`. |
-| Waiting on | The newest open wait. `agent_end` closes asks and approvals; a plan review outlasts the turn. |
+| Plan review | `plan_review_requested` until `plan_review_resolved`, by `reviewId`. omp emits the close after the overlay shuts, so the close re-reads `ctx.isIdle()`: an approved plan that already runs is busy. |
+| Waiting on | The highest-ranked open wait: approval, then plan review, then ask (0.1.1+; 0.1.0 reported the newest). `agent_end` closes asks and approvals; a plan review outlasts the turn. |
 | Shutdown | `session_shutdown` turns focus reporting off and removes the input listener. A process exit hook also turns it off. |
 
 Every handler is guarded: nothing the core does throws into omp, and each handler returns
