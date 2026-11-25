@@ -1,0 +1,38 @@
+{
+  "name": "@mystravil/omp-session-core",
+  "version": "0.1.0",
+  "description": "Shared per-session state for oh-my-pi extensions: one provider per event bus, elected by version.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MYSTRAVIL/omp-session-core.git"
+  },
+  "keywords": [
+    "oh-my-pi",
+    "omp",
+    "extension",
+    "terminal-focus"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --target bun --format esm --outfile dist/index.js && tsc -p tsconfig.build.json",
+    "test": "tsc --noEmit && bun test",
+    "consumer": "bun scripts/consumer.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.0"
+  }
+}
