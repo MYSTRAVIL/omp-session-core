@@ -56,8 +56,7 @@ jobs:
           package-manager-cache: false
       # Trusted publishing needs npm 11.5.1 or later; pin the release npm instead of the runner's.
       - run: npm install -g npm@11.21.2
-      # 0.1.0 was published by hand, because npm sets up a trusted publisher only for a package that
-      # exists. Its tag, and any re-run of a published tag, ends here instead of failing the publish.
+      # A re-run of a tag whose version is already on npm ends here instead of failing the publish.
       - name: Skip a version already on npm
         id: published
         run: |
