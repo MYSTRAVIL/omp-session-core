@@ -221,6 +221,25 @@ test("after a switch, a move outside any turn is still followed", async () => {
   expect(core.state()).toMatchObject({ sessionId: "s2-moved", movedFrom: "s2" });
 });
 
+test("on omp without move notices, an app's before_agent_start handler sees a move made between turns", async () => {
+  const session = new FakeSession({ id: "s1", hasUI: true, agent: MAIN_AGENT });
+  let seen: string | undefined;
+  const core = session.load((pi) => {
+    const core = startSessionCore(pi);
+    pi.on("before_agent_start", () => {
+      seen = core.state()?.sessionId;
+    });
+    return core;
+  });
+  await session.start();
+  session.id = "s1-moved";
+  session.header = { continuationOf: "s1" };
+  await session.emit("before_agent_start", { prompt: "go" });
+
+  expect(seen).toBe("s1-moved");
+  expect(core.state()?.movedFrom).toBe("s1");
+});
+
 test("a fork is not a move", async () => {
   const { session, core } = await started();
   await session.switchTo("s2", "fork", { parentSession: "s1" });

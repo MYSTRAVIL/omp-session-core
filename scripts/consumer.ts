@@ -48,10 +48,13 @@ try {
 
 export const seen: string[] = [];
 
+export let idle: number | null | undefined;
+
 export default function (pi: OmpExtensionApi): void {
   const core = startSessionCore(pi);
   core.onState((state: SessionStateV1) => seen.push(\`state:\${state.status}\`));
   pi.on("agent_start", () => seen.push(\`own:\${core.state()?.status}\`));
+  idle = core.idleMs();
 }
 `,
   );
@@ -59,10 +62,21 @@ export default function (pi: OmpExtensionApi): void {
     JSON.stringify({ compilerOptions: { strict: true, noEmit: true, types: [], skipLibCheck: false, target: "ES2022", module, moduleResolution }, files: ["ext.ts"] });
   await Bun.write(join(app, "tsconfig.esm.json"), tsconfig("ESNext", "bundler"));
   await Bun.write(join(app, "tsconfig.cjs.json"), tsconfig("CommonJS", "node10"));
+  await Bun.write(join(app, "tsconfig.nodenext.json"), tsconfig("NodeNext", "NodeNext"));
   run(["bun", tsc, "-p", "tsconfig.esm.json"], app);
   check(true, "an ESM app type-checks against the shipped types");
   run(["bun", tsc, "-p", "tsconfig.cjs.json"], app);
   check(true, "a CommonJS app type-checks against the shipped types");
+  run(["bun", tsc, "-p", "tsconfig.nodenext.json"], app);
+  check(true, "an ESM app on NodeNext resolution type-checks against the shipped types");
+
+  // Apps test their extension under Node (vitest), where bun:ffi does not exist: the core must load.
+  const node = process.platform === "win32" && (await Bun.file("C:\\dev\\nodejs\\node.exe").exists()) ? "C:\\dev\\nodejs\\node.exe" : "node";
+  const loaded = run(
+    [node, "--input-type=module", "-e", 'const m = await import("@mystravil/omp-session-core"); console.log(typeof m.startSessionCore, m.startSessionCore({ on() {} }).idleMs());'],
+    app,
+  ).trim();
+  check(loaded === "function null", `the core loads under Node, with no desk idle there (${loaded})`);
 
   const bundle = await Bun.build({ entrypoints: [join(app, "ext.ts")], target: "bun", format: "esm", external: ["@oh-my-pi/*"] });
   const output = bundle.outputs[0];
@@ -99,6 +113,8 @@ export default function (pi: OmpExtensionApi): void {
   await emit("session_start");
   await emit("agent_start");
   check(extension.seen.join(",") === "state:idle,state:busy,own:busy", `the bundled extension follows the session (${extension.seen.join(",")})`);
+  const idleOk = process.platform === "win32" ? typeof extension.idle === "number" : extension.idle === null;
+  check(idleOk, `desk idle works in the bundled extension under Bun (${extension.idle})`);
 } finally {
   rmSync(app, { recursive: true, force: true });
 }

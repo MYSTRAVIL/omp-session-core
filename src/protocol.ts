@@ -6,7 +6,7 @@
  * provider emits both channels for one deprecation window.
  */
 
-import { isRecord } from "./guards";
+import { isRecord } from "./guards.js";
 
 /** Every change to a session's state, as {@link SessionStateV1}. */
 export const SESSION_STATE_CHANNEL = "session-state";

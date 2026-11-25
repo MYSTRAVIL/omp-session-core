@@ -1,4 +1,4 @@
-import { FFIType, dlopen } from "bun:ffi";
+import type * as BunFfi from "bun:ffi";
 
 /** Reads how long the user has been idle; `null` when that is unknown. */
 type IdleProbe = () => number | null;
@@ -15,6 +15,9 @@ let probe: IdleProbe | undefined;
  * counters, so their difference wraps with them (every ~49.7 days).
  */
 function windowsProbe(): IdleProbe {
+  // Required here, not imported at the top: the core must also load under Node, where an app
+  // tests its extension and `bun:ffi` does not exist. There the require throws and idle is unknown.
+  const { FFIType, dlopen }: typeof BunFfi = require("bun:ffi");
   const user32 = dlopen("user32.dll", {
     GetLastInputInfo: { args: [FFIType.ptr], returns: FFIType.i32 },
   });

@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
-import { isRecord } from "./guards";
-import type { OmpContext } from "./omp";
-import type { AgentIdentity, TerminalIdentity } from "./protocol";
+import { isRecord } from "./guards.js";
+import type { OmpContext } from "./omp.js";
+import type { AgentIdentity, TerminalIdentity } from "./protocol.js";
 
 /** `ctx.agent` as omp 18.3.2+ reports it; `undefined` on older omp or when it is malformed. */
 export function agentOf(ctx: OmpContext): AgentIdentity | undefined {

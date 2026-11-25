@@ -139,7 +139,7 @@ Versioning:
 |---|---|
 | Start | `session_start`: identity from `ctx`; status from `ctx.isIdle()`; a plan review already open (`ctx.getPendingPlanReview()`) counts. |
 | Switch | `session_switch`, `session_branch`: new identity, waits dropped, input listener installed again (omp drops extension input listeners when it replaces the session). |
-| Silent move | The id is checked on `message_start`, `turn_end`, every status event, and each persistence notice from `sessionManager.onPersistenceNotice` (omp 18.5+), which catches a move outside any turn. A new id whose header names the old one (`continuationOf ?? parentSession`) is a move: `movedFrom` is set and open waits stay. Any other new id drops the waits. |
+| Silent move | The id is checked on `before_agent_start`, `message_start`, `turn_end`, every status event, and each persistence notice from `sessionManager.onPersistenceNotice` (omp 18.5+), which catches a move outside any turn. A new id whose header names the old one (`continuationOf ?? parentSession`) is a move: `movedFrom` is set and open waits stay. Any other new id drops the waits. |
 | Busy | `agent_start`, `turn_start`. |
 | Idle | `agent_end`, unless `willContinue` without `awaitingAsyncWork`. A background-job wait is idle: the session takes input. |
 | Ask | `tool_call` with `toolName === 'ask'` until its `tool_result`. |

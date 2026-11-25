@@ -1,5 +1,5 @@
-import { isRecord } from "./guards";
-import { compareVersions } from "./semver";
+import { isRecord } from "./guards.js";
+import { compareVersions } from "./semver.js";
 
 /**
  * The process-wide registry every copy of the core shares, at

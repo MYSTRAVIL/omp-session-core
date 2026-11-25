@@ -1,5 +1,5 @@
-import { deskIdleMs } from "./desk-idle";
-import type { OmpEventBus, OmpExtensionApi } from "./omp";
+import { deskIdleMs } from "./desk-idle.js";
+import type { OmpEventBus, OmpExtensionApi } from "./omp.js";
 import {
   SESSION_STATE_CHANNEL,
   type SessionStateV1,
@@ -7,13 +7,13 @@ import {
   type TerminalFocusV1,
   asSessionState,
   asTerminalFocus,
-} from "./protocol";
-import { Provider } from "./provider";
-import { type BusV1, type CandidateV1, busEntry, elect, registry } from "./registry";
-import { VERSION } from "./version";
+} from "./protocol.js";
+import { Provider } from "./provider.js";
+import { type BusV1, type CandidateV1, busEntry, elect, registry } from "./registry.js";
+import { VERSION } from "./version.js";
 
-export * from "./protocol";
-export type { OmpExtensionApi } from "./omp";
+export * from "./protocol.js";
+export type { OmpExtensionApi } from "./omp.js";
 
 /** One app's view of the session core on its event bus. */
 export interface SessionCore {
@@ -48,6 +48,7 @@ const PASSED_ON_EVENTS = [
   "session_tree",
   "session_compact",
   "session_shutdown",
+  "before_agent_start",
   "agent_start",
   "agent_end",
   "turn_start",

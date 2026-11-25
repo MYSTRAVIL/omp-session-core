@@ -1,5 +1,5 @@
-import { agentOf, hasTerminal, isSubagent, terminalIdentity } from "./identity";
-import type { OmpContext, OmpEventBus } from "./omp";
+import { agentOf, hasTerminal, isSubagent, terminalIdentity } from "./identity.js";
+import type { OmpContext, OmpEventBus } from "./omp.js";
 import {
   SESSION_STATE_CHANNEL,
   type SessionStateV1,
@@ -7,8 +7,8 @@ import {
   TERMINAL_FOCUS_CHANNEL,
   type TerminalFocusV1,
   type WaitingOn,
-} from "./protocol";
-import { FOCUS_REPORTING_OFF, FOCUS_REPORTING_ON, TerminalFocus } from "./terminal-focus";
+} from "./protocol.js";
+import { FOCUS_REPORTING_OFF, FOCUS_REPORTING_ON, TerminalFocus } from "./terminal-focus.js";
 
 /** The fields of a session state that only change when omp runs another session. */
 type Identity = Pick<
@@ -90,7 +90,9 @@ export class Provider {
     ["agent_start", (_, ctx) => this.#busy(ctx)],
     ["turn_start", (_, ctx) => this.#busy(ctx)],
     // A move's first write lands after `agent_start`, so the id is checked
-    // again as each message starts and each turn ends.
+    // again as each message starts and each turn ends. A move made between
+    // turns on omp without persistence notices shows by `before_agent_start`.
+    ["before_agent_start", (_, ctx) => this.#follow(ctx)],
     ["message_start", (_, ctx) => this.#follow(ctx)],
     ["turn_end", (_, ctx) => this.#follow(ctx)],
     [

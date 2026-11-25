@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.1.2
+
+- The shipped types use `.js` import specifiers, so an app on `moduleResolution: NodeNext` (or
+  node16) imports them without TS2834/TS2460. Found by Coral's adoption.
+- `bun:ffi` loads on the first desk idle read instead of at import, so the core loads under Node
+  (an app's vitest run) with no alias; `idleMs()` is `null` there.
+- `before_agent_start` is a move check point too, so an app's own `before_agent_start` handler sees
+  a move made between turns on omp without persistence notices.
+
 ## 0.1.1
 
 - With several waits open, `waitingOn` reports the most pressing one: an approval outranks a plan
