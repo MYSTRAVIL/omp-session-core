@@ -60,11 +60,13 @@ probe starts as a port of omp-remote `packages/agent/src/host-idle.ts`.
 
 ## Provider election
 
-omp runs every extension's factory before it emits the first `session_start` (omp 19.0.1
-`loader.ts` `bindPreparedExtensions`, then `runtime-init.ts` emits `session_start`). Subagents rebind
-fresh extension instances to their own `ExtensionAPI` and event bus without re-evaluating modules, so
-module state is shared across a process while buses are not. A subagent gets its own `session_start`
-too: the task executor runs `initializeExtensions` for it.
+omp binds each extension and sends it `session_start`, but not all before the first `session_start`.
+In the TUI it defers an extension whose previous load registered nothing needed before the first
+frame (`startup-deferral.ts`): it binds after the composer accepts input and gets the same
+`session_start` replayed. omp-manager's release run saw this with every core-using extension on the
+owner's machine. Subagents rebind fresh extension instances to their own `ExtensionAPI` and event
+bus without re-evaluating modules, so module state is shared across a process while buses are not.
+A subagent gets its own `session_start` too: the task executor runs `initializeExtensions` for it.
 
 - **Register:** at factory time each copy registers a candidate in a process-wide registry at
   `globalThis[Symbol.for('omp-session-core')]`, keyed by the extension's event bus. It also registers
@@ -87,9 +89,12 @@ too: the task executor runs `initializeExtensions` for it.
   wants that an older copy does not pass on still reaches it in its own extension's slot. The list
   holds no per-delta event (`message_update`, `tool_execution_update`).
 - **Late copies stay clients:** a copy bound after the first `session_start` (omp replays the same
-  event object to it) finds the provider set and never replaces it, even when it is newer.
+  event object to it) finds the provider set and never replaces it, even when it is newer. Its
+  `onState` and `onFocus` get the current state and focus at once (0.1.3+), so it misses nothing.
 - **Outdated copies stand down:** an app not updated yet ships an older core, and the newer copy
-  wins. Each app therefore gets at least the version it bundled.
+  wins among the copies bound before the first `session_start`. Because omp defers extensions, a
+  newer copy bound late runs under an older provider's rules until the session restarts with it
+  bound early. The registry has no way to retire a 0.1.x provider (open question).
 - **The registry contract is frozen:** old copies must read a registry made by new ones. Any change
   to these shapes needs a new symbol:
 
@@ -174,6 +179,10 @@ reading registries made by new code.
 
 ## Open questions
 
+- Provider handover: omp defers extensions, so a newer copy is often bound after an older one was
+  elected. A newer provider could take over only from a provider that can retire (stop its input
+  listener and hand over its focus). That needs a new candidate field, so a new registry symbol or a
+  documented additive change; 0.1.0 to 0.1.3 providers cannot retire.
 - Desk idle time on Linux and macOS.
 - Whether Coral wants focus or desk idle at all, or only identity and lifecycle.
 - omp's own user-wait tracking (`user-wait.ts`, wrapping `ui.select/confirm/input/...`) is not

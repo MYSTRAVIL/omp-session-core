@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, jest, test } from "bun:test";
 import { buildCopy, type Core, removeCopies } from "./copies";
 import { FakeSession, FakeTerminal, MAIN_AGENT } from "./fake-omp";
 import { type CapturedStdout, captureStdout } from "./stdout";
@@ -166,6 +166,33 @@ test("a copy bound after the first session_start stays a client, even when newer
   expect(late.isProvider()).toBe(false);
   expect(session.terminal.listeners.size).toBe(1);
   expect(late.state()?.sessionId).toBe("s1");
+});
+
+test("a copy omp binds after the first session_start gets the current state and focus at once", async () => {
+  jest.useFakeTimers();
+  try {
+    const session = mainSession();
+    session.load(older.startSessionCore);
+    await session.start();
+    session.terminal.type("\x1b[O");
+    jest.advanceTimersByTime(100);
+    // omp defers an extension that registers nothing needed before the first frame: its factory
+    // runs after session_start went out, so its listeners join after the first state.
+    const states: string[] = [];
+    const focus: boolean[] = [];
+    session.load((pi) => {
+      const core = newer.startSessionCore(pi);
+      core.onState((state) => states.push(`${state.sessionId}:${state.status}`));
+      core.onFocus((f) => focus.push(f.focused));
+      return core;
+    });
+    await session.replayStartToLast();
+
+    expect(states).toEqual(["s1:idle"]);
+    expect(focus).toEqual([false]);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test("an older client follows the state a newer provider publishes", async () => {

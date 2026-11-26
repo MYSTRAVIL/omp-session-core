@@ -1,6 +1,6 @@
 {
   "name": "@mystravil/omp-session-core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Shared per-session state for oh-my-pi extensions: one provider per event bus, elected by version.",
   "license": "MIT",
   "type": "module",

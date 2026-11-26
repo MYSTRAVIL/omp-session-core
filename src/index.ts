@@ -21,9 +21,9 @@ export interface SessionCore {
   readonly version: string;
   /** True when this copy runs the state machine for its bus; false before the first `session_start`. */
   isProvider(): boolean;
-  /** Every change to the session's state. Returns the unsubscribe. */
+  /** The current state at once, when there is one, then every change. Returns the unsubscribe. */
   onState(listener: (state: SessionStateV1) => void): () => void;
-  /** Every settled change of the terminal's focus. Returns the unsubscribe. */
+  /** The terminal's current focus at once, when known, then every settled change. Returns the unsubscribe. */
   onFocus(listener: (focus: TerminalFocusV1) => void): () => void;
   /** The session's current state; `undefined` until the provider has started. */
   state(): SessionStateV1 | undefined;
@@ -112,32 +112,43 @@ export function startSessionCore(pi: OmpExtensionApi): SessionCore {
   }
 }
 
+/**
+ * Calls `listener` with the current value at once, when there is one, then with each value
+ * published on `channel`. A copy omp binds late (it defers extensions that register nothing
+ * needed before the first frame) would otherwise miss the state published before it joined.
+ */
 function subscribe<T>(
   bus: OmpEventBus,
   channel: string,
   parse: (data: unknown) => T | undefined,
+  current: () => T | undefined,
   listener: (value: T) => void,
 ): () => void {
+  const deliver = (value: T): void => {
+    try {
+      listener(value);
+    } catch {
+      // An app's listener must not break the others.
+    }
+  };
+  let off: unknown;
   try {
-    const off = bus.on(channel, (data) => {
+    off = bus.on(channel, (data) => {
       const value = parse(data);
-      if (value === undefined) return;
-      try {
-        listener(value);
-      } catch {
-        // An app's listener must not break the others.
-      }
+      if (value !== undefined) deliver(value);
     });
-    return () => {
-      try {
-        if (typeof off === "function") off();
-      } catch {
-        // Unsubscribing never throws.
-      }
-    };
   } catch {
     return () => {};
   }
+  const now = current();
+  if (now !== undefined) deliver(now);
+  return () => {
+    try {
+      if (typeof off === "function") off();
+    } catch {
+      // Unsubscribing never throws.
+    }
+  };
 }
 
 /** Reads the provider, which may be another copy of any version. */
@@ -151,13 +162,17 @@ function fromProvider<T>(entry: BusV1, read: (provider: CandidateV1) => T, fallb
 }
 
 function clientCore(bus: OmpEventBus, entry: BusV1, candidate: CandidateV1): SessionCore {
+  const state = (): SessionStateV1 | undefined =>
+    fromProvider(entry, (p) => asSessionState(p.current(SESSION_STATE_CHANNEL)), undefined);
+  const focus = (): TerminalFocusV1 | undefined =>
+    fromProvider(entry, (p) => asTerminalFocus(p.current(TERMINAL_FOCUS_CHANNEL)), undefined);
   return {
     version: VERSION,
     isProvider: () => entry.provider === candidate,
-    onState: (listener) => subscribe(bus, SESSION_STATE_CHANNEL, asSessionState, listener),
-    onFocus: (listener) => subscribe(bus, TERMINAL_FOCUS_CHANNEL, asTerminalFocus, listener),
-    state: () => fromProvider(entry, (p) => asSessionState(p.current(SESSION_STATE_CHANNEL)), undefined),
-    focus: () => fromProvider(entry, (p) => asTerminalFocus(p.current(TERMINAL_FOCUS_CHANNEL)), undefined),
+    onState: (listener) => subscribe(bus, SESSION_STATE_CHANNEL, asSessionState, state, listener),
+    onFocus: (listener) => subscribe(bus, TERMINAL_FOCUS_CHANNEL, asTerminalFocus, focus, listener),
+    state,
+    focus,
     idleMs: () => (entry.provider ? fromProvider(entry, (p) => p.idleMs(), null) : deskIdleMs()),
   };
 }

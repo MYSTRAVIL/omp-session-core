@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.1.3
+
+- `onState` and `onFocus` call a new listener at once with the current state or focus, then with
+  each change. omp defers binding extensions that register nothing needed before the first frame,
+  so a copy bound after `session_start` missed the first state until the next change. Found by
+  omp-manager's release run.
+
 ## 0.1.2
 
 - The shipped types use `.js` import specifiers, so an app on `moduleResolution: NodeNext` (or

@@ -31,7 +31,8 @@ export default function (pi) {
 ```
 
 Every copy passes omp's events on to the provider, so `state()` is current inside each of your own
-handlers, whichever extension loaded first.
+handlers, whichever extension loaded first. `onState` and `onFocus` call a new listener at once with
+the current state or focus, so an extension omp binds late misses nothing.
 
 `startSessionCore` never throws. On an omp without `pi.events` it returns a core that reports
 nothing.

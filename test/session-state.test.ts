@@ -96,6 +96,15 @@ test("a session that is streaming when the core starts reports busy", async () =
   expect(core.state()?.status).toBe("busy");
 });
 
+test("a listener that subscribes after the first state gets it at once, then each change", async () => {
+  const { session, core } = await started();
+  const statuses: string[] = [];
+  core.onState((state) => statuses.push(state.status));
+  await session.emit("agent_start");
+
+  expect(statuses).toEqual(["idle", "busy"]);
+});
+
 test("a state goes out only when it changes", async () => {
   const { session, states } = await started();
   await session.emit("agent_start");
